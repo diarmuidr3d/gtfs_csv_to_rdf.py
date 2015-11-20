@@ -2,7 +2,7 @@ from rdflib import Graph
 
 __author__ = 'Diarmuid'
 
-class gtfs_csv_to_rdf:
+class gtfsCsvToRdf:
 
     def __init__(self, format, uri=None):
         self.graph = Graph(identifier=uri)
