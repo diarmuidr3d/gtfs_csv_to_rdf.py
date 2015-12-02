@@ -18,6 +18,7 @@ class gtfsCsvToRdf:
         self.format = format
         self.agency_ids = {}
         self.stop_ids = {}
+        self.route_ids = {}
 
     def convert_agency(self, csv_filename):
         read_agency = DictReader(open(csv_filename))
@@ -78,6 +79,27 @@ class gtfsCsvToRdf:
                     accessibility = self.GTFS.CheckParentStation
                 stop.add(self.GTFS.wheelchairAccesssible, accessibility)
 
+    def convert_routes(self, csv_filename):
+        route_types = [self.GTFS.LightRail, self.GTFS.Subway, self.GTFS.Rail, self.GTFS.Bus, self.GTFS.Ferry, self.GTFS.CableCar, self.GTFS.Gondola, self.GTFS.Funicular]
+        read_routes = DictReader(open(csv_filename))
+        print(read_routes.fieldnames)
+        for row in read_routes:
+            route = self.get_route(row["route_id"])
+            route.add(self.GTFS.shortName, Literal(row["route_short_name"], datatype=XSD.string))
+            route.add(self.GTFS.longName, Literal(row["route_long_name"], datatype=XSD.string))
+            route.add(self.GTFS.routeType, route_types[int(row["route_type"])])
+            if "agency_id" in row:
+                route.add(self.GTFS.agency, self.agency_ids[row["agency_id"]])
+            if "route_desc" in row:
+                route.add(DC.description, Literal(row["route_desc"], datatype=XSD.string))
+            # not implemented yet
+            # if "route_url" in row:
+            #     route.add(self.GTFS.routeUrl, row["route_url"])
+            if "route_color" in row:
+                route.add(self.GTFS.color, Literal(row["route_color"], datatype=XSD.string))
+            if "route_text_color" in row:
+                route.add(self.GTFS.textColor, Literal(row["route_text_color"], datatype=XSD.string))
+
     def output(self):
         self.graph.serialize(destination=self.output_file,format=self.format)
 
@@ -89,6 +111,13 @@ class gtfsCsvToRdf:
 
     def get_zone(self, id):
         the_zone = Resource(self.graph, URIRef(self.uri + id))
-        the_zone.add(RDF.type, self.GTFS.Zone)
-        the_zone.add(DC.identifier, Literal(id, datatype=XSD.string))
+        the_zone.set(RDF.type, self.GTFS.Zone)
+        the_zone.set(DC.identifier, Literal(id, datatype=XSD.string))
         return the_zone
+
+    def get_route(self, id):
+        route = Resource(self.graph, URIRef(self.uri + id))
+        self.route_ids[id] = route
+        route.set(RDF.type, self.GTFS.Route)
+        route.set(DC.identifier, Literal(id, datatype=XSD.string))
+        return route
