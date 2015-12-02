@@ -17,8 +17,6 @@ class gtfsCsvToRdf:
         self.uri = uri
         self.format = format
         self.agency_ids = {}
-        self.stop_ids = {}
-        self.route_ids = {}
 
     def convert_agency(self, csv_filename):
         read_agency = DictReader(open(csv_filename))
@@ -62,21 +60,12 @@ class gtfsCsvToRdf:
             else:
                 stop.set(RDF.type, self.GTFS.Stop)
             if 'parent_station' in row:
-                parent_id = row['parent_station']
-                if parent_id in self.stop_ids:
-                    stop.add(self.GTFS.parentStation, self.stop_ids[parent_id])
-                elif parent_id is not "":
-                    stop.add(self.GTFS.parentStation, self.get_stop(parent_id))
+                if row['parent_station'] is not "":
+                    stop.add(self.GTFS.parentStation, self.get_stop(row['parent_station']))
             if 'stop_timezone' in row:
                 stop.add(self.GTFS.timeZone, Literal(row['stop_timezone'], datatype=XSD.string))
             if 'wheelchair_boarding' in row:
-                wheelchair = row['wheelchair_boarding']
-                if wheelchair is "1":
-                    accessibility = self.GTFS.WheelchairAccessible
-                elif wheelchair is "2":
-                    accessibility = self.GTFS.NotWheelchairAccessible
-                else:
-                    accessibility = self.GTFS.CheckParentStation
+                accessibility = self.get_wheelchair_accessible(row['wheelchair_boarding'])
                 stop.add(self.GTFS.wheelchairAccesssible, accessibility)
 
     def convert_routes(self, csv_filename):
@@ -100,12 +89,36 @@ class gtfsCsvToRdf:
             if "route_text_color" in row:
                 route.add(self.GTFS.textColor, Literal(row["route_text_color"], datatype=XSD.string))
 
+    def convert_trips(self, csv_filename):
+        read_trips = DictReader(open(csv_filename))
+        print(read_trips.fieldnames)
+        for row in read_trips:
+            trip = self.get_trip(row["trip_id"])
+            trip.add(self.GTFS.route, self.get_route(row["route_id"]))
+            trip.add(self.GTFS.service, self.get_service(row["service_id"]))
+            if "trip_headsign" in row:
+                trip.add(self.GTFS.headsign, Literal(row["trip_headsign"], datatype=XSD.string))
+            if "trip_short_name" in row:
+                trip.add(self.GTFS.shortName, Literal(row["trip_short_name"], datatype=XSD.string))
+            if "direction_id" in row:
+                trip.add(self.GTFS.direction, Literal(row["direction_id"], datatype=XSD.boolean))
+            if "block_id" in row:
+                trip.add(self.GTFS.block, Literal(row["block_id"], datatype=XSD.nonNegativeInteger))
+            if "shape_id" in row:
+                trip.add(self.GTFS.shape, self.get_shape(row["shape_id"]))
+            if "wheelchair_accessible" in row:
+                accessibility = self.get_wheelchair_accessible(row['wheelchair_accessible'])
+                trip.add(self.GTFS.wheelchairAccessible, accessibility)
+            if "bikes_allowed" in row:
+                bikes = self.get_bikes_allowed(row["bikes_allowed"])
+                trip.add(self.GTFS.bikesAllowed, bikes)
+
+
     def output(self):
-        self.graph.serialize(destination=self.output_file,format=self.format)
+        self.graph.serialize(destination=self.output_file, format=self.format)
 
     def get_stop(self, id):
         stop = Resource(self.graph, URIRef(self.uri + id))
-        self.stop_ids[id] = stop
         stop.set(DC.identifier, Literal(id, datatype=XSD.string))
         return stop
 
@@ -117,7 +130,41 @@ class gtfsCsvToRdf:
 
     def get_route(self, id):
         route = Resource(self.graph, URIRef(self.uri + id))
-        self.route_ids[id] = route
         route.set(RDF.type, self.GTFS.Route)
         route.set(DC.identifier, Literal(id, datatype=XSD.string))
         return route
+
+    def get_trip(self, id):
+        trip = Resource(self.graph, URIRef(self.uri + id))
+        trip.set(RDF.type, self.GTFS.Trip)
+        trip.set(DC.identifier, Literal(id, datatype=XSD.string))
+        return trip
+
+    def get_service(self, id):
+        service = Resource(self.graph, URIRef(self.uri + id))
+        service.set(RDF.type, self.GTFS.Service)
+        service.set(DC.identifier, Literal(id, datatype=XSD.string))
+        return service
+
+    def get_shape(self, id):
+        shape = Resource(self.graph, URIRef(self.uri + id))
+        shape.set(RDF.type, self.GTFS.Shape)
+        shape.set(DC.identifier, Literal(id, datatype=XSD.string))
+        return shape
+
+    def get_wheelchair_accessible(self, wheelchair):
+        if wheelchair is "1":
+            accessibility = self.GTFS.WheelchairAccessible
+        elif wheelchair is "2":
+            accessibility = self.GTFS.NotWheelchairAccessible
+        else:
+            accessibility = self.GTFS.CheckParentStation
+        return accessibility
+
+    def get_bikes_allowed(self, code):
+        bikes = 0
+        if code is "0" or "2":
+            bikes = 0
+        elif code is "1":
+            bikes = 1
+        return Literal(bikes, datatype=XSD.boolean)
