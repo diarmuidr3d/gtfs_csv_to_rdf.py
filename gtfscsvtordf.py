@@ -5,7 +5,7 @@ from rdflib.resource import Resource
 
 __author__ = 'Diarmuid'
 
-class gtfsCsvToRdf:
+class GtfsCsvToRdf:
 
     def __init__(self, uri, output_file, format='n3'):
         self.output_file = output_file
@@ -113,6 +113,30 @@ class gtfsCsvToRdf:
                 bikes = self.get_bikes_allowed(row["bikes_allowed"])
                 trip.add(self.GTFS.bikesAllowed, bikes)
 
+    def convert_stop_times(self, csv_filename):
+        stop_time_num = 0
+        read_stop_times = DictReader(open(csv_filename))
+        print(read_stop_times.fieldnames)
+        for row in read_stop_times:
+            stop_time = Resource(self.graph, URIRef(self.uri + "StopTIme" + str(stop_time_num)))
+            stop_time.set(RDF.type, self.GTFS.StopTime)
+            stop_time.add(self.GTFS.trip, self.get_trip(row["trip_id"]))
+            stop_time.add(self.GTFS.arrivalTime, Literal(row["arrival_time"], datatype=XSD.string))
+            stop_time.add(self.GTFS.departureTime, Literal(row["departure_time"], datatype=XSD.string))
+            stop_time.add(self.GTFS.stop, self.get_stop(row["stop_id"]))
+            stop_time.add(self.GTFS.stopSequence, Literal(row["stop_sequence"], datatype=XSD.nonNegativeInteger))
+            if "stop_headsign" in row:
+                stop_time.add(self.GTFS.headsign, Literal(row["stop_headsign"], datatype=XSD.string))
+            if "pickup_type" in row:
+                pickup_type = self.get_stop_type(row["pickup_type"])
+                stop_time.add(self.GTFS.pickupType, pickup_type)
+            if "drop_off_type" in row:
+                dropoff_type = self.get_stop_type(row["drop_off_type"])
+                stop_time.add(self.GTFS.dropOffType, dropoff_type)
+            if "shape_dist_traveled" in row:
+                stop_time.add(self.GTFS.distanceTraveled, Literal(row["shape_dist_traveled"], datatype=XSD.nonNegativeInteger))
+            # if "timepoint" in row:
+                #do something... this predicate is not implemented yet
 
     def output(self):
         self.graph.serialize(destination=self.output_file, format=self.format)
@@ -168,3 +192,16 @@ class gtfsCsvToRdf:
         elif code is "1":
             bikes = 1
         return Literal(bikes, datatype=XSD.boolean)
+
+    def get_stop_type(self, code):
+        if code is 0:
+            pickup_type = self.GTFS.Regular
+        elif code is 1:
+            pickup_type = self.GTFS.NotAvailable
+        elif code is 2:
+            pickup_type = self.GTFS.MustPhone
+        elif code is 3:
+            pickup_type = self.GTFS.MustCoordinateWithDriver
+        else:
+            pickup_type = self.GTFS.NotAvailable
+        return pickup_type
