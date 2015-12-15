@@ -159,10 +159,23 @@ class GtfsCsvToRdf:
             calendar.set(self.GTFS.saturday, Literal(int(row["saturday"]), datatype=XSD.boolean))
             calendar.set(self.GTFS.sunday, Literal(int(row["sunday"]), datatype=XSD.boolean))
             temporal = Resource(self.graph, URIRef(str(calendar) + "_temporal"))
-            start = datetime.strptime(row["start_date"], "%Y%m%d").strftime("%Y-%m-%d")
-            temporal.add(self.SCHEMA.startDate, Literal(start, datatype=XSD.date))
-            end = datetime.strptime(row["end_date"], "%Y%m%d").strftime("%Y-%m-%d")
-            temporal.add(self.SCHEMA.endDate, Literal(end, datatype=XSD.date))
+            temporal.set(RDF.type, DCTERMS.temporal)
+            temporal.add(self.SCHEMA.startDate, self.get_date_literal(row["start_date"]))
+            temporal.add(self.SCHEMA.endDate, self.get_date_literal(row["end_date"]))
+
+    def convert_calendar_dates(self, csv_filename):
+        read_dates = DictReader(open(csv_filename))
+        print(read_dates.fieldnames)
+        for row in read_dates:
+            service = self.get_service(row["service_id"])
+            calendarDate = Resource(self.graph, URIRef(self.uri + row["service_id"] + "_cal" + "_" + row["date"]))
+            service.add(self.GTFS.serviceRule, calendarDate)
+            calendarDate.set(RDF.type, self.GTFS.CalendarDateRule)
+            calendarDate.add(DCTERMS.date, self.get_date_literal(row["date"]))
+            exception_type = row["exception_type"]
+            if exception_type is "2":
+                exception_type = "0"
+            calendarDate.add(self.GTFS.dateAddition, Literal(exception_type, datatype=XSD.boolean))
 
     def output(self):
         self.graph.serialize(destination=self.output_file, format=self.format)
@@ -231,3 +244,6 @@ class GtfsCsvToRdf:
         else:
             pickup_type = self.GTFS.NotAvailable
         return pickup_type
+
+    def get_date_literal(self, date):
+        return Literal(datetime.strptime(date, "%Y%m%d").strftime("%Y-%m-%d"), datatype=XSD.date)
