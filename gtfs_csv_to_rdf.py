@@ -21,15 +21,16 @@ class GtfsCsvToRdf:
         self.graph.bind("schema", self.SCHEMA)
         self.uri = uri
         self.serialize = serialize
-        self.agency_ids = {}
 
     def convert_agency(self, csv_filename):
-        read_agency = DictReader(open(csv_filename))
+        read_agency = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_agency.fieldnames)
         for row in read_agency:
-            url = row['agency_url']
-            agency = Resource(self.graph, URIRef(url))
-            agency.add(RDF.type, self.GTFS.Agency)
+            if "agency_id" in row:
+                agency = self.get_agency(row["agency_id"])
+            else:
+                agency = Resource(self.graph, URIRef(row['agency_url']))
+                agency.add(RDF.type, self.GTFS.Agency)
             name = Literal(row['agency_name'], datatype=XSD.string)
             agency.add(FOAF.name, name)
             timezone = Literal(row['agency_timezone'], datatype=XSD.string)
@@ -40,12 +41,9 @@ class GtfsCsvToRdf:
                 agency.add(FOAF.phone, Literal(row['agency_phone'], datatype=XSD.string))
             if 'agency_fare_url' in row:
                 agency.add(self.GTFS.fareUrl, URIRef(row['agency_fare_url']))
-            if 'agency_id' in row:
-                self.agency_ids[row['agency_id']] = agency
-                agency.add(DCTERMS.identifier, Literal(row['agency_id'], datatype=XSD.string))
 
     def convert_stops(self, csv_filename):
-        read_stops = DictReader(open(csv_filename))
+        read_stops = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_stops.fieldnames)
         for row in read_stops:
             stop = self.get_stop(row['stop_id'])
@@ -76,7 +74,7 @@ class GtfsCsvToRdf:
     def convert_routes(self, csv_filename):
         route_types = [self.GTFS.LightRail, self.GTFS.Subway, self.GTFS.Rail, self.GTFS.Bus, self.GTFS.Ferry,
                        self.GTFS.CableCar, self.GTFS.Gondola, self.GTFS.Funicular]
-        read_routes = DictReader(open(csv_filename))
+        read_routes = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_routes.fieldnames)
         for row in read_routes:
             route = self.get_route(row["route_id"])
@@ -84,7 +82,7 @@ class GtfsCsvToRdf:
             route.add(self.GTFS.longName, Literal(row["route_long_name"], datatype=XSD.string))
             route.add(self.GTFS.routeType, route_types[int(row["route_type"])])
             if "agency_id" in row:
-                route.add(self.GTFS.agency, self.agency_ids[row["agency_id"]])
+                route.add(self.GTFS.agency, self.get_agency(row["agency_id"]))
             if "route_desc" in row:
                 route.add(DCTERMS.description, Literal(row["route_desc"], datatype=XSD.string))
             # not implemented yet
@@ -96,7 +94,7 @@ class GtfsCsvToRdf:
                 route.add(self.GTFS.textColor, Literal(row["route_text_color"], datatype=XSD.string))
 
     def convert_trips(self, csv_filename):
-        read_trips = DictReader(open(csv_filename))
+        read_trips = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_trips.fieldnames)
         for row in read_trips:
             trip = self.get_trip(row["trip_id"])
@@ -121,10 +119,10 @@ class GtfsCsvToRdf:
 
     def convert_stop_times(self, csv_filename):
         stop_time_num = 0
-        read_stop_times = DictReader(open(csv_filename))
+        read_stop_times = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_stop_times.fieldnames)
         for row in read_stop_times:
-            stop_time = Resource(self.graph, URIRef(self.uri + "StopTIme" + str(stop_time_num)))
+            stop_time = Resource(self.graph, URIRef(self.uri + "StopTime_" + str(stop_time_num)))
             stop_time.set(RDF.type, self.GTFS.StopTime)
             stop_time.add(self.GTFS.trip, self.get_trip(row["trip_id"]))
             stop_time.add(self.GTFS.arrivalTime, Literal(row["arrival_time"], datatype=XSD.string))
@@ -147,27 +145,27 @@ class GtfsCsvToRdf:
                 # do something... this predicate is not implemented yet
 
     def convert_calendar(self, csv_filename):
-        read_calendar = DictReader(open(csv_filename))
+        read_calendar = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_calendar.fieldnames)
         for row in read_calendar:
             service = self.get_service(row["service_id"])
             calendar = Resource(self.graph, URIRef(self.uri + row["service_id"] + "_cal"))
             service.add(self.GTFS.serviceRule, calendar)
             calendar.set(RDF.type, self.GTFS.CalendarRule)
-            calendar.set(self.GTFS.monday, Literal(int(row["monday"]), datatype=XSD.boolean))
-            calendar.set(self.GTFS.tuesday, Literal(int(row["tuesday"]), datatype=XSD.boolean))
-            calendar.set(self.GTFS.wednesday, Literal(int(row["wednesday"]), datatype=XSD.boolean))
-            calendar.set(self.GTFS.thursday, Literal(int(row["thursday"]), datatype=XSD.boolean))
-            calendar.set(self.GTFS.friday, Literal(int(row["friday"]), datatype=XSD.boolean))
-            calendar.set(self.GTFS.saturday, Literal(int(row["saturday"]), datatype=XSD.boolean))
-            calendar.set(self.GTFS.sunday, Literal(int(row["sunday"]), datatype=XSD.boolean))
-            temporal = Resource(self.graph, URIRef(str(calendar) + "_temporal"))
+            calendar.set(self.GTFS.monday, Literal(row["monday"], datatype=XSD.boolean))
+            calendar.set(self.GTFS.tuesday, Literal(row["tuesday"], datatype=XSD.boolean))
+            calendar.set(self.GTFS.wednesday, Literal(row["wednesday"], datatype=XSD.boolean))
+            calendar.set(self.GTFS.thursday, Literal(row["thursday"], datatype=XSD.boolean))
+            calendar.set(self.GTFS.friday, Literal(row["friday"], datatype=XSD.boolean))
+            calendar.set(self.GTFS.saturday, Literal(row["saturday"], datatype=XSD.boolean))
+            calendar.set(self.GTFS.sunday, Literal(row["sunday"], datatype=XSD.boolean))
+            temporal = Resource(self.graph, URIRef(self.uri + row["service_id"] + "_cal" + "_temporal"))
             temporal.set(RDF.type, DCTERMS.temporal)
             temporal.add(self.SCHEMA.startDate, self.get_date_literal(row["start_date"]))
             temporal.add(self.SCHEMA.endDate, self.get_date_literal(row["end_date"]))
 
     def convert_calendar_dates(self, csv_filename):
-        read_dates = DictReader(open(csv_filename))
+        read_dates = DictReader(open(csv_filename), skipinitialspace=True)
         print(read_dates.fieldnames)
         for row in read_dates:
             service = self.get_service(row["service_id"])
@@ -180,43 +178,68 @@ class GtfsCsvToRdf:
                 exception_type = "0"
             calendar_date.add(self.GTFS.dateAddition, Literal(exception_type, datatype=XSD.boolean))
 
+    def convert_fare_attributes(self, csv_filename):
+        read_fares = DictReader(open(csv_filename), skipinitialspace=True)
+        print(read_fares.fieldnames)
+        for row in read_fares:
+            fare = self.get_fare(row["fare_id"])
+            fare.set(self.SCHEMA.price, Literal(row["price"]))
+            fare.set(self.GTFS.priceCurrency, Literal(row["currency_type"]))
+            fare.set(self.GTFS.paymentMethod, self.get_payment_method(row["payment_method"]))
+            fare.set(self.GTFS.transfers, self.get_transfers(row["transfers"]))
+            if "transfer_duration" in row:
+                fare.set(self.GTFS.transferExpiryTime,
+                         Literal(row["transfer_duration"], datatype=XSD.nonNegativeInteger))
+
     def output(self):
         self.graph.serialize(destination=self.output_file, format=self.serialize)
 
+    def get_agency(self, agency_id):
+        agency = Resource(self.graph, URIRef(self.uri + "agency_" + agency_id))
+        agency.add(RDF.type, self.GTFS.Agency)
+        agency.set(DCTERMS.identifier, Literal(agency_id, datatype=XSD.string))
+        return agency
+
     def get_stop(self, stop_id):
-        stop = Resource(self.graph, URIRef(self.uri + stop_id))
+        stop = Resource(self.graph, URIRef(self.uri + "stop_" + stop_id))
         stop.set(DCTERMS.identifier, Literal(stop_id, datatype=XSD.string))
         return stop
 
     def get_zone(self, zone_id):
-        the_zone = Resource(self.graph, URIRef(self.uri + zone_id))
+        the_zone = Resource(self.graph, URIRef(self.uri + "zone_" + zone_id))
         the_zone.set(RDF.type, self.GTFS.Zone)
         the_zone.set(DCTERMS.identifier, Literal(zone_id, datatype=XSD.string))
         return the_zone
 
     def get_route(self, route_id):
-        route = Resource(self.graph, URIRef(self.uri + route_id))
+        route = Resource(self.graph, URIRef(self.uri + "route_" + route_id))
         route.set(RDF.type, self.GTFS.Route)
         route.set(DCTERMS.identifier, Literal(route_id, datatype=XSD.string))
         return route
 
     def get_trip(self, trip_id):
-        trip = Resource(self.graph, URIRef(self.uri + trip_id))
+        trip = Resource(self.graph, URIRef(self.uri + "trip_" + trip_id))
         trip.set(RDF.type, self.GTFS.Trip)
         trip.set(DCTERMS.identifier, Literal(trip_id, datatype=XSD.string))
         return trip
 
     def get_service(self, service_id):
-        service = Resource(self.graph, URIRef(self.uri + service_id))
+        service = Resource(self.graph, URIRef(self.uri + "service_" + service_id))
         service.set(RDF.type, self.GTFS.Service)
         service.set(DCTERMS.identifier, Literal(service_id, datatype=XSD.string))
         return service
 
     def get_shape(self, shape_id):
-        shape = Resource(self.graph, URIRef(self.uri + shape_id))
+        shape = Resource(self.graph, URIRef(self.uri + "shape_" + shape_id))
         shape.set(RDF.type, self.GTFS.Shape)
         shape.set(DCTERMS.identifier, Literal(shape_id, datatype=XSD.string))
         return shape
+
+    def get_fare(self, fare_id):
+        fare = Resource(self.graph, URIRef(self.uri + "fare_" + fare_id))
+        fare.set(RDF.type, self.GTFS.FareClass)
+        fare.set(DCTERMS.identifier, Literal(fare_id, datatype=XSD.string))
+        return fare
 
     def get_wheelchair_accessible(self, wheelchair):
         if wheelchair is "1":
@@ -239,6 +262,22 @@ class GtfsCsvToRdf:
         else:
             pickup_type = self.GTFS.NotAvailable
         return pickup_type
+
+    def get_payment_method(self, code):
+        if code is "0":
+            return self.GTFS.OnBoard
+        else:
+            return self.GTFS.BeforeBoarding
+
+    def get_transfers(self, code):
+        if int(code) is 0:
+            return self.GTFS.NoTransfersAllowed
+        elif int(code) is 1:
+            return self.GTFS.OneTransfersAllowed
+        elif int(code) is 2:
+            return self.GTFS.TwoTransfersAllowed
+        else:
+            return self.GTFS.UnlimitedTransfersAllowed
 
     @staticmethod
     def get_bikes_allowed(code):
