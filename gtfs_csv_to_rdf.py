@@ -224,6 +224,36 @@ class GtfsCsvToRdf:
                 shape_point.set(self.GTFS.distanceTraveled, Literal(str.strip(row["shape_dist_traveled"]),
                                                                     datatype=XSD.nonNegativeInteger))
 
+    def convert_frequencies(self, csv_filename):
+        read_freqs = DictReader(open(csv_filename), skipinitialspace=True)
+        print(read_freqs.fieldnames)
+        for row in read_freqs:
+            freq = Resource(self.graph, URIRef(self.uri + str.strip(row["trip_id"]) + str.strip(row["start_time"]) + str.strip(row["end_time"])))
+            freq.set(RDF.type, self.GTFS.Frequency)
+            freq.add(self.GTFS.trip, self.get_trip(str.strip(row["trip_id"])))
+            freq.add(self.GTFS.startTime, Literal(str.strip(row["start_time"]), datatype=XSD.string))
+            freq.add(self.GTFS.endTime, Literal(str.strip(row["end_time"]), datatype=XSD.string))
+            freq.add(self.GTFS.headwaySeconds, Literal(str.strip(row["headway_secs"]), datatype=XSD.nonNegativeInteger))
+            if "exact_times" in row:
+                exact = False
+                if str.strip(row["exact_times"]) == "1":
+                    exact = True
+                freq.add(self.GTFS.exactTimes, Literal(exact, datatype=XSD.boolean))
+
+    def convert_transfers(self, csv_filename):
+        read_transfers = DictReader(open(csv_filename), skipinitialspace=True)
+        print(read_transfers.fieldnames)
+        for row in read_transfers:
+            from_stop = str.strip(row["from_stop_id"])
+            to_stop = str.strip(row["to_stop_id"])
+            transfers = Resource(self.graph, URIRef(self.uri + "_" + from_stop + "_" + to_stop))
+            transfers.set(RDF.type, self.GTFS.TransferRule)
+            transfers.add(self.GTFS.originStop, self.get_stop(from_stop))
+            transfers.add(self.GTFS.destinationStop, self.get_stop(to_stop))
+            transfers.add(self.GTFS.transferType, self.get_transfer_type(str.strip(row["transfer_type"])))
+            if "min_transfer_time" in row and str.strip(row["min_transfer_time"]):
+                transfers.add(self.GTFS.minimumTransferTime, Literal(str.strip(row["min_transfer_time"]), datatype=XSD.nonNegativeInteger))
+
     def output(self):
         self.graph.serialize(destination=self.output_file, format=self.serialize)
 
@@ -311,6 +341,16 @@ class GtfsCsvToRdf:
             return self.GTFS.TwoTransfersAllowed
         else:
             return self.GTFS.UnlimitedTransfersAllowed
+
+    def get_transfer_type(self, code):
+        if int(code) == 3:
+            return self.GTFS.NoTransfer
+        elif int(code) is 1:
+            return self.GTFS.EnsuredTransfer
+        elif int(code) is 2:
+            return self.GTFS.MinimumTimeTransfer
+        else:
+            return self.GTFS.RecommendedTransfer
 
     @staticmethod
     def get_bikes_allowed(code):
