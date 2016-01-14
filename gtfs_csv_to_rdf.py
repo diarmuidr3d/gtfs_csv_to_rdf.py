@@ -209,6 +209,21 @@ class GtfsCsvToRdf:
             if "contains_id" in row and str.strip(row["contains_id"]) != "":
                 fare_rule.add(self.GTFS.zone, self.get_zone(str.strip(row["contains_id"])))
 
+    def convert_shapes(self, csv_filename):
+        read_shapes = DictReader(open(csv_filename), skipinitialspace=True)
+        print(read_shapes.fieldnames)
+        for row in read_shapes:
+            shape = self.get_shape(str.strip(row["shape_id"]))
+            shape_point = Resource(self.graph, URIRef(str(shape.identifier) + "_" + str.strip(row["shape_pt_sequence"])))
+            shape.add(self.GTFS.shapePoint, shape_point)
+            shape_point.set(RDF.type, self.GTFS.ShapePoint)
+            shape_point.set(self.GEO.long, Literal(str.strip(row["shape_pt_lon"]), datatype=XSD.string))
+            shape_point.set(self.GEO.lat, Literal(str.strip(row["shape_pt_lat"]), datatype=XSD.string))
+            shape_point.set(self.GTFS.pointSequence, Literal(str.strip(row["shape_pt_sequence"]), datatype=XSD.nonNegativeInteger))
+            if "shape_dist_traveled" in row and str.strip(row["shape_dist_traveled"]) != "":
+                shape_point.set(self.GTFS.distanceTraveled, Literal(str.strip(row["shape_dist_traveled"]),
+                                                                    datatype=XSD.nonNegativeInteger))
+
     def output(self):
         self.graph.serialize(destination=self.output_file, format=self.serialize)
 
