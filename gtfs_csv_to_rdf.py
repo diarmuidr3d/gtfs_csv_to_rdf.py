@@ -1,4 +1,7 @@
 from datetime import datetime
+import os
+import shutil
+from zipfile import ZipFile
 from rdflib import Graph, Namespace, RDF, Literal, XSD, URIRef
 from csv import DictReader
 from rdflib.namespace import FOAF, DCTERMS
@@ -13,7 +16,7 @@ class GtfsCsvToRdf:
     SCHEMA = Namespace("http://schema.org/")
     GTFS = Namespace("http://vocab.gtfs.org/terms#")
 
-    def __init__(self, uri, output_file, serialize='n3'):
+    def __init__(self, uri, output_file, serialize='n3', zip_file=None):
         self.output_file = output_file
         self.graph = Graph(identifier=uri)
         self.graph.bind("gtfs", self.GTFS)
@@ -22,10 +25,59 @@ class GtfsCsvToRdf:
         self.uri = uri
         self.serialize = serialize
         self.next_fare_rule_num = 0
+        if zip_file is not None:
+            self.open_zip(zip_file)
+
+    def open_zip(self, filename):
+        dir_name = "gtfs_extract"
+        # ZipFile.extractall(filename, path=dir_name)
+        zip = ZipFile(filename)
+        zip.extractall(dir_name)
+        self.convert_directory(dir_name)
+        # shutil.rmtree(dir_name)
+
+    def convert_directory(self, dir_name):
+        if os.path.isdir(dir_name):
+            cwd = os.getcwd()
+            os.chdir(dir_name)
+            if os.path.isfile("agency.txt"):
+                self.convert_agency("agency.txt")
+            if os.path.isfile("stops.txt"):
+                self.convert_stops("stops.txt")
+            if os.path.isfile("routes.txt"):
+                self.convert_routes("routes.txt")
+            if os.path.isfile("trips.txt"):
+                self.convert_trips("trips.txt")
+            if os.path.isfile("stop_times.txt"):
+                self.convert_stop_times("stop_times.txt")
+            if os.path.isfile("calendar.txt"):
+                self.convert_calendar("calendar.txt")
+            if os.path.isfile("calendar_dates.txt"):
+                self.convert_calendar_dates("calendar_dates.txt")
+            if os.path.isfile("fare_attributes.txt"):
+                self.convert_fare_attributes("fare_attributes.txt")
+            if os.path.isfile("fare_rules.txt"):
+                self.convert_fare_rules("fare_rules.txt")
+            if os.path.isfile("shapes.txt"):
+                self.convert_shapes("shapes.txt")
+            if os.path.isfile("frequencies.txt"):
+                self.convert_frequencies("frequencies.txt")
+            if os.path.isfile("transfers.txt"):
+                self.convert_transfers("transfers.txt")
+            if os.path.isfile("feed_info.txt"):
+                self.convert_feed("feed_info.txt")
+            os.chdir(cwd)
+            self.output()
+
+    def __open_file(self, filename):
+        file_read = DictReader(open(filename), skipinitialspace=True)
+        if file_read.fieldnames[0].find("ï»¿") >= 0:
+            file_read.fieldnames[0] = file_read.fieldnames[0][3:]
+        print(file_read.fieldnames)
+        return file_read
 
     def convert_agency(self, csv_filename):
-        read_agency = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_agency.fieldnames)
+        read_agency = self.__open_file(csv_filename)
         for row in read_agency:
             if "agency_id" in row:
                 agency = self.get_agency(str.strip(row["agency_id"]))
@@ -44,8 +96,7 @@ class GtfsCsvToRdf:
                 agency.add(self.GTFS.fareUrl, URIRef(row['agency_fare_url']))
 
     def convert_stops(self, csv_filename):
-        read_stops = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_stops.fieldnames)
+        read_stops = self.__open_file(csv_filename)
         for row in read_stops:
             stop = self.get_stop(row['stop_id'])
             stop.add(FOAF.name, Literal(row['stop_name'], datatype=XSD.string))
@@ -74,8 +125,7 @@ class GtfsCsvToRdf:
     def convert_routes(self, csv_filename):
         route_types = [self.GTFS.LightRail, self.GTFS.Subway, self.GTFS.Rail, self.GTFS.Bus, self.GTFS.Ferry,
                        self.GTFS.CableCar, self.GTFS.Gondola, self.GTFS.Funicular]
-        read_routes = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_routes.fieldnames)
+        read_routes = self.__open_file(csv_filename)
         for row in read_routes:
             route = self.get_route(str.strip(row["route_id"]))
             route.add(self.GTFS.shortName, Literal(str.strip(row["route_short_name"]), datatype=XSD.string))
@@ -94,8 +144,7 @@ class GtfsCsvToRdf:
                 route.add(self.GTFS.textColor, Literal(str.strip(row["route_text_color"]), datatype=XSD.string))
 
     def convert_trips(self, csv_filename):
-        read_trips = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_trips.fieldnames)
+        read_trips = self.__open_file(csv_filename)
         for row in read_trips:
             trip = self.get_trip(str.strip(row["trip_id"]))
             trip.add(self.GTFS.route, self.get_route(str.strip(row["route_id"])))
@@ -119,8 +168,7 @@ class GtfsCsvToRdf:
 
     def convert_stop_times(self, csv_filename):
         stop_time_num = 0
-        read_stop_times = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_stop_times.fieldnames)
+        read_stop_times = self.__open_file(csv_filename)
         for row in read_stop_times:
             stop_time = Resource(self.graph, URIRef(self.uri + "StopTime_" + str(stop_time_num)))
             stop_time.set(RDF.type, self.GTFS.StopTime)
@@ -145,8 +193,7 @@ class GtfsCsvToRdf:
                 # do something... this predicate is not implemented yet
 
     def convert_calendar(self, csv_filename):
-        read_calendar = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_calendar.fieldnames)
+        read_calendar = self.__open_file(csv_filename)
         for row in read_calendar:
             service = self.get_service(str.strip(row["service_id"]))
             calendar = Resource(self.graph, URIRef(self.uri + str.strip(row["service_id"]) + "_cal"))
@@ -165,8 +212,7 @@ class GtfsCsvToRdf:
             temporal.add(self.SCHEMA.endDate, self.get_date_literal(str.strip(row["end_date"])))
 
     def convert_calendar_dates(self, csv_filename):
-        read_dates = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_dates.fieldnames)
+        read_dates = self.__open_file(csv_filename)
         for row in read_dates:
             service = self.get_service(str.strip(row["service_id"]))
             calendar_date = Resource(self.graph, URIRef(self.uri + str.strip(row["service_id"]) + "_cal" + "_" + str.strip(row["date"])))
@@ -179,8 +225,7 @@ class GtfsCsvToRdf:
             calendar_date.add(self.GTFS.dateAddition, Literal(exception_type, datatype=XSD.boolean))
 
     def convert_fare_attributes(self, csv_filename):
-        read_fares = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_fares.fieldnames)
+        read_fares = self.__open_file(csv_filename)
         for row in read_fares:
             fare = self.get_fare(str.strip(row["fare_id"]))
             fare.set(self.SCHEMA.price, Literal(str.strip(row["price"])))
@@ -192,8 +237,7 @@ class GtfsCsvToRdf:
                          Literal(str.strip(row["transfer_duration"]), datatype=XSD.nonNegativeInteger))
 
     def convert_fare_rules(self, csv_filename):
-        read_fares = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_fares.fieldnames)
+        read_fares = self.__open_file(csv_filename)
         for row in read_fares:
             fare = self.get_fare(str.strip(row["fare_id"]))
             fare_rule = Resource(self.graph, URIRef(self.uri + str.strip(row["fare_id"]) + "_rule_" + str(self.next_fare_rule_num)))
@@ -210,8 +254,7 @@ class GtfsCsvToRdf:
                 fare_rule.add(self.GTFS.zone, self.get_zone(str.strip(row["contains_id"])))
 
     def convert_shapes(self, csv_filename):
-        read_shapes = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_shapes.fieldnames)
+        read_shapes = self.__open_file(csv_filename)
         for row in read_shapes:
             shape = self.get_shape(str.strip(row["shape_id"]))
             shape_point = Resource(self.graph, URIRef(str(shape.identifier) + "_" + str.strip(row["shape_pt_sequence"])))
@@ -225,8 +268,7 @@ class GtfsCsvToRdf:
                                                                     datatype=XSD.nonNegativeInteger))
 
     def convert_frequencies(self, csv_filename):
-        read_freqs = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_freqs.fieldnames)
+        read_freqs = self.__open_file(csv_filename)
         for row in read_freqs:
             freq = Resource(self.graph, URIRef(self.uri + str.strip(row["trip_id"]) + str.strip(row["start_time"]) + str.strip(row["end_time"])))
             freq.set(RDF.type, self.GTFS.Frequency)
@@ -241,8 +283,7 @@ class GtfsCsvToRdf:
                 freq.add(self.GTFS.exactTimes, Literal(exact, datatype=XSD.boolean))
 
     def convert_transfers(self, csv_filename):
-        read_transfers = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_transfers.fieldnames)
+        read_transfers = self.__open_file(csv_filename)
         for row in read_transfers:
             from_stop = str.strip(row["from_stop_id"])
             to_stop = str.strip(row["to_stop_id"])
@@ -255,8 +296,7 @@ class GtfsCsvToRdf:
                 transfers.add(self.GTFS.minimumTransferTime, Literal(str.strip(row["min_transfer_time"]), datatype=XSD.nonNegativeInteger))
 
     def convert_feed(self, csv_filename):
-        read_feed = DictReader(open(csv_filename), skipinitialspace=True)
-        print(read_feed.fieldnames)
+        read_feed = self.__open_file(csv_filename)
         for row in read_feed:
             feed = Resource(self.graph, URIRef(str.strip(row["publisher"])))
             feed.set(RDF.type, self.GTFS.Feed)
