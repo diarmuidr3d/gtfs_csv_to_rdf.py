@@ -254,6 +254,23 @@ class GtfsCsvToRdf:
             if "min_transfer_time" in row and str.strip(row["min_transfer_time"]):
                 transfers.add(self.GTFS.minimumTransferTime, Literal(str.strip(row["min_transfer_time"]), datatype=XSD.nonNegativeInteger))
 
+    def convert_feed(self, csv_filename):
+        read_feed = DictReader(open(csv_filename), skipinitialspace=True)
+        print(read_feed.fieldnames)
+        for row in read_feed:
+            feed = Resource(self.graph, URIRef(str.strip(row["publisher"])))
+            feed.set(RDF.type, self.GTFS.Feed)
+            feed.add(DCTERMS.publisher, Literal(str.strip(row["publisher"]), datatype=XSD.string))
+            feed.add(DCTERMS.title, Literal(str.strip(row["feed_publisher_name"]), datatype=XSD.string))
+            feed.add(DCTERMS.language, Literal(str.strip(row["feed_lang"]), datatype=XSD.string))
+            if "feed_version" in row and str.strip(row["feed_version"]) != "":
+                feed.add(self.SCHEMA.version, Literal(row["feed_version"], datatype=XSD.string))
+            if "feed_start_date" in row and str.strip(row["feed_start_date"]) != "" and "feed_end_date" in row and str.strip(row["feed_end_date"]) != "":
+                temporal = Resource(self.graph, URIRef(feed.identifier + "_temporal"))
+                temporal.set(RDF.type, DCTERMS.temporal)
+                temporal.add(self.SCHEMA.startDate, self.get_date_literal(str.strip(row["feed_start_date"])))
+                temporal.add(self.SCHEMA.endDate, self.get_date_literal(str.strip(row["feed_end_date"])))
+
     def output(self):
         self.graph.serialize(destination=self.output_file, format=self.serialize)
 
