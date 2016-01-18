@@ -209,7 +209,7 @@ class GtfsCsvToRdf:
             calendar.set(self.GTFS.saturday, Literal(str.strip(row["saturday"]), datatype=XSD.boolean))
             calendar.set(self.GTFS.sunday, Literal(str.strip(row["sunday"]), datatype=XSD.boolean))
             temporal = Resource(self.graph, URIRef(self.uri + str.strip(row["service_id"]) + "_cal" + "_temporal"))
-            temporal.set(RDF.type, DCTERMS.temporal)
+            calendar.set(DCTERMS.temporal, temporal)
             temporal.add(self.SCHEMA.startDate, self.get_date_literal(str.strip(row["start_date"])))
             temporal.add(self.SCHEMA.endDate, self.get_date_literal(str.strip(row["end_date"])))
 
