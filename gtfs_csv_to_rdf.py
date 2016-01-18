@@ -175,8 +175,8 @@ class GtfsCsvToRdf:
             stop_time = Resource(self.graph, URIRef(self.uri + stop_id + "_StopTime_" + sequence_num))
             stop_time.set(RDF.type, self.GTFS.StopTime)
             stop_time.add(self.GTFS.trip, self.get_trip(str.strip(row["trip_id"])))
-            stop_time.add(self.GTFS.arrivalTime, Literal(str.strip(row["arrival_time"]), datatype=XSD.string))
-            stop_time.add(self.GTFS.departureTime, Literal(str.strip(row["departure_time"]), datatype=XSD.string))
+            stop_time.add(self.GTFS.arrivalTime, Literal(str.strip(row["arrival_time"]), datatype=XSD.time))
+            stop_time.add(self.GTFS.departureTime, Literal(str.strip(row["departure_time"]), datatype=XSD.time))
             stop_time.add(self.GTFS.stop, self.get_stop(stop_id))
             stop_time.add(self.GTFS.stopSequence, Literal(sequence_num, datatype=XSD.nonNegativeInteger))
             if "stop_headsign" in row:
