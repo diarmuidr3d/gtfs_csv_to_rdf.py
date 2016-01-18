@@ -172,9 +172,10 @@ class GtfsCsvToRdf:
         for row in read_stop_times:
             stop_id = str.strip(row["stop_id"])
             sequence_num = str.strip(row["stop_sequence"])
-            stop_time = Resource(self.graph, URIRef(self.uri + stop_id + "_StopTime_" + sequence_num))
+            trip_id = str.strip(row["trip_id"])
+            stop_time = Resource(self.graph, URIRef(self.uri + trip_id + "_" + stop_id + "_StopTime_" + sequence_num))
             stop_time.set(RDF.type, self.GTFS.StopTime)
-            stop_time.add(self.GTFS.trip, self.get_trip(str.strip(row["trip_id"])))
+            stop_time.add(self.GTFS.trip, self.get_trip(trip_id))
             stop_time.add(self.GTFS.arrivalTime, Literal(str.strip(row["arrival_time"]), datatype=XSD.time))
             stop_time.add(self.GTFS.departureTime, Literal(str.strip(row["departure_time"]), datatype=XSD.time))
             stop_time.add(self.GTFS.stop, self.get_stop(stop_id))
