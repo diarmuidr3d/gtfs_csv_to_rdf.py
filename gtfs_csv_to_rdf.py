@@ -6,6 +6,7 @@ from rdflib import Graph, Namespace, RDF, Literal, XSD, URIRef
 from csv import DictReader
 from rdflib.namespace import FOAF, DCTERMS
 from rdflib.resource import Resource
+import sys
 
 __author__ = 'Diarmuid'
 
@@ -16,7 +17,7 @@ class GtfsCsvToRdf:
     SCHEMA = Namespace("http://schema.org/")
     GTFS = Namespace("http://vocab.gtfs.org/terms#")
 
-    def __init__(self, uri, output_file, serialize='n3', zip_file=None):
+    def __init__(self, uri, output_file, zip_file=None, serialize='n3'):
         self.output_file = output_file
         self.graph = Graph(identifier=uri)
         self.graph.bind("gtfs", self.GTFS)
@@ -167,16 +168,17 @@ class GtfsCsvToRdf:
                 trip.add(self.GTFS.bikesAllowed, bikes)
 
     def convert_stop_times(self, csv_filename):
-        stop_time_num = 0
         read_stop_times = self.__open_file(csv_filename)
         for row in read_stop_times:
-            stop_time = Resource(self.graph, URIRef(self.uri + "StopTime_" + str(stop_time_num)))
+            stop_id = str.strip(row["stop_id"])
+            sequence_num = str.strip(row["stop_sequence"])
+            stop_time = Resource(self.graph, URIRef(self.uri + stop_id + "_StopTime_" + sequence_num))
             stop_time.set(RDF.type, self.GTFS.StopTime)
             stop_time.add(self.GTFS.trip, self.get_trip(str.strip(row["trip_id"])))
             stop_time.add(self.GTFS.arrivalTime, Literal(str.strip(row["arrival_time"]), datatype=XSD.string))
             stop_time.add(self.GTFS.departureTime, Literal(str.strip(row["departure_time"]), datatype=XSD.string))
-            stop_time.add(self.GTFS.stop, self.get_stop(str.strip(row["stop_id"])))
-            stop_time.add(self.GTFS.stopSequence, Literal(str.strip(row["stop_sequence"]), datatype=XSD.nonNegativeInteger))
+            stop_time.add(self.GTFS.stop, self.get_stop(stop_id))
+            stop_time.add(self.GTFS.stopSequence, Literal(sequence_num, datatype=XSD.nonNegativeInteger))
             if "stop_headsign" in row:
                 stop_time.add(self.GTFS.headsign, Literal(str.strip(row["stop_headsign"]), datatype=XSD.string))
             if "pickup_type" in row:
@@ -421,3 +423,7 @@ class GtfsCsvToRdf:
     @staticmethod
     def get_date_literal(date):
         return Literal(datetime.strptime(date, "%Y%m%d").strftime("%Y-%m-%d"), datatype=XSD.date)
+
+if __name__ == "__main__":
+    print(sys.argv)
+    GtfsCsvToRdf(uri=sys.argv[1], output_file=sys.argv[2], zip_file=sys.argv[3])
